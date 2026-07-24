@@ -6,11 +6,13 @@ import Metas from "./pages/Metas";
 import Graficos from "./pages/Graficos";
 import Marcos from "./pages/Marcos";
 import Expedicoes from "./pages/Expedicoes";
+import ErrorPage from "./pages/ErrorPage";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: Layout,
+    errorElement: <ErrorPage />,
     children: [
       { index: true, Component: Home },
       { path: "mes", Component: Mes },
@@ -20,4 +22,4 @@ export const router = createBrowserRouter([
       { path: "expedicoes", Component: Expedicoes },
     ],
   },
-]);
+], { basename: '/Liberdade/' });
