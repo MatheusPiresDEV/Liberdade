@@ -5,7 +5,7 @@ import { router } from "./routes";
 import { AppContext } from "./context";
 import {
   ADMIN_PWD, WALLPAPERS, DEFAULT_DATA, tod, greeting, fmtDateLong,
-  firestoreRef, setDoc, onSnapshot, loadLS, saveLS,
+  firestoreRef, setDoc, onSnapshot, loadLS, saveLS, normalizeAppData,
   getRandomQuote, saveProgressCache,
   type AppData,
 } from "./data";
@@ -224,35 +224,52 @@ type Screen = "lock" | "login" | "dashboard";
 export default function App() {
   const [screen, setScreen] = useState<Screen>("lock");
   const [mode, setMode] = useState<"admin" | "visitor" | null>(null);
-  const [data, setData] = useState<AppData>({ ...DEFAULT_DATA, milestones: Array(8).fill(false) });
+  const [data, setData] = useState<AppData>(() => loadLS());
   const [loginReady, setLoginReady] = useState(false);
 
-  // Load data when mode is set
   useEffect(() => {
-    if (mode === "visitor") {
-      setData(loadLS());
-    } else if (mode === "admin") {
-      const unsub = onSnapshot(firestoreRef, snap => {
-        if (snap.exists()) {
-          const d = snap.data() as AppData;
-          setData({
-            ...DEFAULT_DATA, ...d,
-            milestones: d.milestones ?? Array(8).fill(false),
-            months: d.months ?? [],
-            goalTargets: { ...DEFAULT_DATA.goalTargets, ...(d.goalTargets ?? {}) },
-          });
+    const saved = loadLS();
+    setData(saved);
+    saveProgressCache(saved.milestones);
+  }, []);
+
+  useEffect(() => {
+    if (mode === "admin") {
+      const unsub = onSnapshot(
+        firestoreRef,
+        snap => {
+          if (snap.exists()) {
+            const remote = normalizeAppData(snap.data() as Partial<AppData>);
+            setData(remote);
+            saveLS(remote);
+            saveProgressCache(remote.milestones);
+          }
+        },
+        error => {
+          console.warn("Firebase indisponível, usando armazenamento local.", error);
         }
-      });
+      );
       return unsub;
+    }
+
+    if (mode === "visitor") {
+      const saved = loadLS();
+      setData(saved);
+      saveProgressCache(saved.milestones);
     }
   }, [mode]);
 
   const saveData = useCallback((newData: AppData) => {
-    setData(newData);
-    // Always cache milestones so lock screen can read them before login
-    saveProgressCache(newData.milestones);
-    if (mode === "admin") setDoc(firestoreRef, newData).catch(console.error);
-    else saveLS(newData);
+    const normalized = normalizeAppData(newData);
+    setData(normalized);
+    saveLS(normalized);
+    saveProgressCache(normalized.milestones);
+
+    if (mode === "admin") {
+      setDoc(firestoreRef, normalized).catch(error => {
+        console.warn("Falha ao salvar no Firebase, dados preservados no localStorage.", error);
+      });
+    }
   }, [mode]);
 
   const handleUnlock = () => { setLoginReady(true); setScreen("login"); };

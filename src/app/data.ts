@@ -131,6 +131,24 @@ export const DEFAULT_DATA: AppData = {
   goalTargets: { tiros: 2000, cabana: 120000, vstrom: 45000, liberdade: 300000, expedicoes: 50000 },
 };
 
+export function normalizeAppData(data?: Partial<AppData> | null): AppData {
+  const base = {
+    ...DEFAULT_DATA,
+    milestones: Array(8).fill(false),
+    months: [],
+    goalTargets: { ...DEFAULT_DATA.goalTargets },
+  };
+
+  const source = data ?? {};
+  return {
+    ...base,
+    ...source,
+    milestones: Array.isArray(source.milestones) ? source.milestones : Array(8).fill(false),
+    months: Array.isArray(source.months) ? source.months : [],
+    goalTargets: { ...base.goalTargets, ...(source.goalTargets ?? {}) },
+  };
+}
+
 // ─── Utils ────────────────────────────────────────────────────────────────────
 export function tod(h: number) {
   if (h < 6) return "madrugada";
@@ -318,15 +336,13 @@ export function getLineData(months: MonthRecord[]) {
 export function loadLS(): AppData {
   try {
     const s = localStorage.getItem(LS_KEY);
-    if (!s) return { ...DEFAULT_DATA, milestones: Array(8).fill(false) };
-    const p = JSON.parse(s);
-    return {
-      ...DEFAULT_DATA, ...p,
-      milestones: p.milestones ?? Array(8).fill(false),
-      months: p.months ?? [],
-      goalTargets: { ...DEFAULT_DATA.goalTargets, ...(p.goalTargets ?? {}) },
-    };
-  } catch { return { ...DEFAULT_DATA, milestones: Array(8).fill(false) }; }
+    if (!s) return normalizeAppData();
+    return normalizeAppData(JSON.parse(s));
+  } catch {
+    return normalizeAppData();
+  }
 }
 
-export function saveLS(data: AppData) { localStorage.setItem(LS_KEY, JSON.stringify(data)); }
+export function saveLS(data: AppData) {
+  localStorage.setItem(LS_KEY, JSON.stringify(normalizeAppData(data)));
+}
